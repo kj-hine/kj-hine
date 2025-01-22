@@ -1,0 +1,14 @@
+ # Filter for the year 1950
+  peak_2020 <- peak_data %>%
+    filter(format(as.Date(peak_dt), "%Y") == "2020") %>%
+    select(site_no, peak_dt, peak_va)
+  
+  if (nrow(peak_2020) == 0) {
+    return(data.frame(site_no = siteNumber, peak_dt = NA, peak_va = NA))
+  }
+  
+  return(peak_2020)
+}
+
+# Initialize an empty data frame to store results
+peak_flows_2020 <- data.frame()
