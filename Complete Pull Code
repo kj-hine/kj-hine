@@ -1,0 +1,69 @@
+# Install and load required packages
+install.packages("dataRetrieval")
+install.packages("dplyr")
+install.packages("readr")
+install.packages("openxlsx")
+
+library(dataRetrieval)
+library(dplyr)
+library(readr)
+library(openxlsx)
+
+# Load the station information from the CSV file
+stations <- read_csv("C://Users//khine//OneDrive - The Pennsylvania State University//Desktop//Grad//560class//all560gauges.csv")
+
+# Function to retrieve peak flow data for the year 1950
+get_peak_flow_2020 <- function(siteNumber) {
+  # Retrieve peak flow data
+  peak_data <- tryCatch(
+    readNWISpeak(siteNumber),
+    error = function(e) NULL
+  )
+  
+  if (is.null(peak_data)) {
+    return(data.frame(site_no = siteNumber, peak_dt = NA, peak_va = NA))
+  }
+  
+  # Filter for the year 1950
+  peak_2020 <- peak_data %>%
+    filter(format(as.Date(peak_dt), "%Y") == "2020") %>%
+    select(site_no, peak_dt, peak_va)
+  
+  if (nrow(peak_2020) == 0) {
+    return(data.frame(site_no = siteNumber, peak_dt = NA, peak_va = NA))
+  }
+  
+  return(peak_2020)
+}
+
+# Initialize an empty data frame to store results
+peak_flows_2020 <- data.frame()
+
+# Loop through each station and retrieve peak flow data
+for (i in 1:nrow(stations)) {
+  site <- stations$siteNumber[i]
+  lat <- stations$Lat[i]
+  long <- stations$Long[i]
+  
+  peak_flow <- get_peak_flow_2020(site)
+  peak_flow$Lat <- lat
+  peak_flow$Long <- long
+  
+  peak_flows_2020 <- bind_rows(peak_flows_2020, peak_flow)
+}
+
+# Merge with original station data to ensure site numbers, lat, and long are included
+final_data <- stations %>%
+  select(siteNumber, Lat, Long) %>%
+  left_join(peak_flows_2020, by = c("siteNumber" = "site_no"))
+
+library(openxlsx)
+
+# Specify the output path for the new Excel file
+output_path <- "C://Users//khine//OneDrive - The Pennsylvania State University//Desktop//Grad//560class//peak_flows_2020.xlsx"  # Replace with your desired path
+
+# Save the data to a new Excel file
+write.xlsx(final_data, output_path, overwrite = TRUE)
+
+# Confirmation message
+print(paste("A new Excel file with the results has been created at:", output_path))
