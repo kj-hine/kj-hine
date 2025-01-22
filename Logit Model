@@ -1,0 +1,37 @@
+# Assuming `average_peak_by_year` contains `year` and `mean_day_of_year`
+
+# Define summer/fall as June (day 152) through November (day 334)
+summer_fall_start <- 152
+summer_fall_end <- 334
+
+# Create a binary variable for whether the peak day is in summer/fall
+average_peak_by_year$summer_fall_peak <- ifelse(
+  average_peak_by_year$mean_day_of_year >= summer_fall_start & 
+    average_peak_by_year$mean_day_of_year <= summer_fall_end, 
+  1, 0
+)
+
+# Fit a logistic regression model to test if the odds of summer/fall peak have changed over time
+logit_model <- glm(summer_fall_peak ~ year, data = average_peak_by_year, family = binomial)
+
+# Summarize the model results
+summary(logit_model)
+
+#########################winter/spring peak chances
+# Assuming `average_peak_by_year` contains `year` and `mean_day_of_year`
+
+# Define winter/spring as December (day 335 or above) and January through May (days 1 to 151)
+# Note that December days will be greater than 334, while Jan-May are from 1 to 151.
+
+# Create a binary variable for whether the peak day is in winter/spring
+average_peak_by_year$winter_spring_peak <- ifelse(
+  average_peak_by_year$mean_day_of_year <= 151 | average_peak_by_year$mean_day_of_year >= 335,
+  1, 0
+)
+
+# Fit a logistic regression model to test if the odds of winter/spring peaks have changed over time
+logit_model_winter_spring <- glm(winter_spring_peak ~ year, data = average_peak_by_year, family = binomial)
+
+# Summarize the model results
+summary(logit_model_winter_spring)
+
