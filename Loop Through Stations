@@ -1,0 +1,28 @@
+# Loop through each station and retrieve peak flow data
+for (i in 1:nrow(stations)) {
+  site <- stations$siteNumber[i]
+  lat <- stations$Lat[i]
+  long <- stations$Long[i]
+  
+  peak_flow <- get_peak_flow_2020(site)
+  peak_flow$Lat <- lat
+  peak_flow$Long <- long
+  
+  peak_flows_2020 <- bind_rows(peak_flows_2020, peak_flow)
+}
+
+# Merge with original station data to ensure site numbers, lat, and long are included
+final_data <- stations %>%
+  select(siteNumber, Lat, Long) %>%
+  left_join(peak_flows_2020, by = c("siteNumber" = "site_no"))
+
+library(openxlsx)
+
+# Specify the output path for the new Excel file
+output_path <- "C://Users//khine//OneDrive - The Pennsylvania State University//Desktop//Grad//560class//peak_flows_2020.xlsx"  # Replace with your desired path
+
+# Save the data to a new Excel file
+write.xlsx(final_data, output_path, overwrite = TRUE)
+
+# Confirmation message
+print(paste("A new Excel file with the results has been created at:", output_path))
