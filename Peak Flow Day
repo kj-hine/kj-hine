@@ -1,0 +1,91 @@
+# Install and load required packages
+if (!requireNamespace("dataRetrieval", quietly = TRUE)) install.packages("dataRetrieval")
+if (!requireNamespace("dplyr", quietly = TRUE)) install.packages("dplyr")
+
+library(dataRetrieval)
+library(dplyr)
+
+# Set working directory
+setwd("C://Users//khine//OneDrive - The Pennsylvania State University//Desktop//Grad//560class")
+
+# Read site data
+site_data <- read.csv("all560gauges.csv", colClasses = c("siteNumbers" = "character"))
+
+# Extract site numbers
+siteNumbers <- site_data$siteNumbers
+
+# Define parameters
+parameterCd <- "00060"  # Discharge
+startDate <- "1950-01-01"
+endDate <- "1950-12-31"
+statCd <- "00003"  # Mean daily discharge
+
+# Initialize a list to store site data
+results_list <- list()
+
+# Function to retrieve data with retries
+retrieve_data <- function(site, retries = 3, delay = 5) {
+  attempt <- 1
+  while (attempt <= retries) {
+    tryCatch({
+      data <- readNWISdv(siteNumbers = site,
+                         parameterCd = parameterCd,
+                         startDate = startDate,
+                         endDate = endDate,
+                         statCd = statCd)
+      return(data)
+    }, error = function(e) {
+      message(paste("Error retrieving data for site:", site, "Attempt:", attempt, "Error message:", e))
+      if (attempt == retries) return(NULL)
+      Sys.sleep(delay)
+      attempt <<- attempt + 1
+    })
+  }
+}
+
+# Retrieve data for each site
+total_sites <- length(siteNumbers)
+for (i in seq_along(siteNumbers)) {
+  site <- siteNumbers[i]
+  if (nchar(site) >= 8) {  # Ensure site number is valid
+    data <- retrieve_data(site)
+    if (!is.null(data)) {
+      results_list[[site]] <- data
+    }
+  } else {
+    message(paste("Invalid site number length for site:", site))
+  }
+  Sys.sleep(1)  # Delay to avoid server overload
+  message(paste("Progress:", i, "out of", total_sites, "sites processed."))
+}
+
+# Initialize a list to store peak flood data
+peak_flood_list <- list()
+
+# Calculate 1 peak flow day per year per station
+for (site in names(results_list)) {
+  site_data <- results_list[[site]]
+  if (!is.null(site_data) && nrow(site_data) > 0) {
+    peak_flood_data <- site_data %>%
+      mutate(Year = format(as.Date(Date), "%Y")) %>%
+      group_by(Site = site, Year) %>%
+      slice_max(order_by = X_00060_00003, n = 1, with_ties = FALSE) %>%
+      ungroup() %>%
+      mutate(Date = as.Date(Date))  # Ensure date is in Date format
+    
+    peak_flood_list[[site]] <- peak_flood_data
+  }
+}
+
+# Combine all peak flow data into one data frame
+peak_flood_data <- bind_rows(peak_flood_list)
+
+# Format date into Gregorian calendar format (ISO 8601: YYYY-MM-DD)
+peak_flood_data <- peak_flood_data %>%
+  mutate(Date = format(Date, "%Y-%m-%d"))
+
+# Save peak flow data to a CSV file
+write.csv(peak_flood_data, "560_peak_days_1950.csv", row.names = FALSE)
+
+# View the combined peak flow data
+head(peak_flood_data)
