@@ -1,0 +1,96 @@
+# Install necessary packages if not already installed DAILY AVERAGE STREAMFLOW
+if (!requireNamespace("dataRetrieval", quietly = TRUE)) install.packages("dataRetrieval")
+if (!requireNamespace("circular", quietly = TRUE)) install.packages("circular")
+if (!requireNamespace("ggplot2", quietly = TRUE)) install.packages("ggplot2")
+if (!requireNamespace("dplyr", quietly = TRUE)) install.packages("dplyr")
+
+# Load libraries
+library(dataRetrieval)
+library(circular)
+library(ggplot2)
+library(dplyr)
+
+# Load your list of gage numbers from the CSV
+gage_list <- read.csv("C://Users//khine//OneDrive - The Pennsylvania State University//Desktop//Grad//560class//560V4.csv", colClasses = c(gage_number = "character"))
+gage_numbers <- gage_list$gage_number
+
+# Define date range
+start_date <- "1950-01-01"
+end_date <- "2020-12-31"
+
+# Initialize an empty data frame to store daily streamflow data
+all_streamflow_data <- data.frame()
+
+# Loop through each gage and retrieve daily streamflow data
+for (gage in gage_numbers) {
+  
+  # Retrieve daily data for the gage
+  flow_data <- tryCatch(
+    {
+      readNWISdv(siteNumbers = gage, parameterCd = "00060", startDate = start_date, endDate = end_date)
+    },
+    error = function(e) {
+      message(paste("Failed to retrieve data for gage", gage, ":", e$message))
+      return(NULL)
+    }
+  )
+  
+  # Check if data is returned; skip if not
+  if (!is.null(flow_data) && nrow(flow_data) > 0) {
+    
+    # Rename columns and verify structure
+    flow_data <- renameNWISColumns(flow_data)
+    print(names(flow_data))  # Print column names to verify structure
+    
+    # Select necessary columns after renaming
+    daily_data <- flow_data %>%
+      mutate(
+        year = as.numeric(format(Date, "%Y")),
+        day_of_year = as.numeric(format(Date, "%j"))
+      ) %>%
+      select(site_no, Date, year, day_of_year, Flow) %>%
+      rename(gage = site_no)  # Rename for consistency
+    
+    # Append to all_streamflow_data
+    all_streamflow_data <- bind_rows(all_streamflow_data, daily_data)
+  } else {
+    message(paste("No data found for gage", gage))
+  }
+}
+
+# Check if we have any data
+if (nrow(all_streamflow_data) > 0) {
+  
+  # Calculate average daily streamflow for each day of the year, for each year
+  daily_avg_streamflow <- all_streamflow_data %>%
+    group_by(year, day_of_year) %>%
+    summarise(mean_flow = mean(Flow, na.rm = TRUE), .groups = "drop") %>%
+    mutate(angle = 2 * pi * (day_of_year / 365))
+  
+  # Convert to circular format
+  daily_avg_streamflow$circular_mean <- circular(daily_avg_streamflow$angle, units = "radians")
+  
+  # Convert day of the year to corresponding months for labeling
+  months <- c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+  month_positions <- seq(0, 2 * pi, length.out = 13)[-13]  # Position angles for each month
+  
+  # Plot rose diagram with separate colored lines for each year and month labels
+  ggplot(daily_avg_streamflow, aes(x = circular_mean, y = mean_flow, color = factor(year), group = year)) +
+    geom_line(size = 0.7) +  # Line plot for each year
+    scale_x_continuous(
+      breaks = month_positions,
+      labels = months,
+      limits = c(0, 2 * pi)
+    ) +
+    coord_polar(start = 0) +
+    scale_color_manual(values = colorRampPalette(RColorBrewer::brewer.pal(12, "Set3"))(length(unique(daily_avg_streamflow$year)))) +
+    theme_minimal() +
+    labs(title = "Daily Average Streamflow by Year", x = NULL, y = "Average Streamflow", color = "Year") +
+    theme(
+      axis.text.x = element_text(size = 10), 
+      axis.title.y = element_blank()
+    )
+  
+} else {
+  message("No streamflow data was found for the specified gages and date range.")
+}
