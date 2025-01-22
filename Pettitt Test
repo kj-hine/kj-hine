@@ -1,0 +1,24 @@
+# Install the trend package if it's not already installed
+if (!requireNamespace("trend", quietly = TRUE)) install.packages("trend")
+
+# Load the trend package
+library(trend)
+
+# Perform the Pettitt test on the mean day of year for peak streamflow
+ptt_result <- pettitt.test(average_peak_by_year$mean_day_of_year)
+
+# Print the results
+print(ptt_result)
+
+# Extract the p-value from the Pettitt test result
+p_value <- ptt_result$p.value
+
+# Determine the estimated change point year
+change_point_index <- ptt_result$estimate
+change_point_year <- average_peak_by_year$year[change_point_index]
+
+# Display the estimated change point year
+cat("The estimated change point year for streamflow seasonality is:", change_point_year, "\n")
+
+# Display the p-value
+cat("P-value of the Pettitt test:", p_value, "\n")
