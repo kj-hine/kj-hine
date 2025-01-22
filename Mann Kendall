@@ -1,0 +1,12 @@
+# Install necessary package if not already installed
+if (!requireNamespace("Kendall", quietly = TRUE)) install.packages("Kendall")
+
+# Load the package
+library(Kendall)
+
+# Assuming `average_peak_by_year` contains the mean peak day of year for each year
+# Perform the Mann-Kendall test for trend in peak streamflow timing
+mk_result <- MannKendall(average_peak_by_year$mean_day_of_year)
+
+# Print the results
+print(mk_result)
